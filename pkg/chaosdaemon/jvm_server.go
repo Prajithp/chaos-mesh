@@ -78,7 +78,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 			log.Info("mkdir", "output", string(output))
 		}
 
-		jars := []string{"byteman.jar", "byteman-helper.jar", "chaos-agent.jar"}
+		jars := []string{"bminstall.sh", "byteman.jar", "byteman-helper.jar", "chaos-agent.jar"}
 
 		for _, jar := range jars {
 			source := fmt.Sprintf("%s/lib/%s", bytemanHome, jar)
