@@ -188,3 +188,40 @@ func GetProcessUidGid(pid uint32) (*ProcessUidGid, error) {
 func EncodeOutputToError(output []byte, err error) error {
 	return errors.Errorf("error code: %v, msg: %s", err, string(output))
 }
+
+func GetNamespacedPID(pid uint32) (uint32, error) {
+	statusPath := fmt.Sprintf("%s/%d/status", bpm.DefaultProcPrefix, pid)
+	file, err := os.Open(statusPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open status file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "NSpid:") {
+			// NSpid format: "NSpid:	1234	5678" (host PID, then container PID)
+			// or "NSpid:	1234" (if same namespace)
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				// The last field is typically the container PID
+				// If there are multiple PIDs, the last one is in the innermost namespace
+				pidStr := fields[len(fields)-1]
+				pid, err := strconv.ParseUint(pidStr, 10, 32)
+				if err != nil {
+					return 0, fmt.Errorf("failed to parse container PID: %w", err)
+				}
+				return uint32(pid), nil
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return 0, fmt.Errorf("failed to read status file: %w", err)
+	}
+
+	return 0, fmt.Errorf("NSpid not found in status file")
+}

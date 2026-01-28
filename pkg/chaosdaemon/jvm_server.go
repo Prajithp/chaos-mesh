@@ -62,15 +62,6 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 		}
 	}
 
-	processUIDGID, err := util.GetProcessUidGid(pid)
-	if err != nil {
-		log.Error(err, "Failed to get UID and GID from the process")
-		processUIDGID = &util.ProcessUidGid{
-			Uid: 0,
-			Gid: 0,
-		}
-	}
-
 	bytemanHome := os.Getenv("BYTEMAN_HOME")
 	if len(bytemanHome) == 0 {
 		return nil, errors.New("environment variable BYTEMAN_HOME not set")
@@ -102,13 +93,24 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 		}
 	}
 
-	bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, pid)
-	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx).SetNS(pid, bpm.MountNS)
+	var processBuilder *bpm.CommandBuilder
+	if nsPid, err := util.GetNamespacedPID(pid); err == nil {
+		bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, nsPid)
+		processBuilder = bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx).SetNS(pid, bpm.MountNS)
+	} else {
+		bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, pid)
+		processBuilder = bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
+	}
+
+	if processUIDGID, err := util.GetProcessUidGid(pid); err == nil {
+		processBuilder = processBuilder.SetUIDGID(processUIDGID.Uid, processUIDGID.Gid)
+	} else {
+		log.Error(err, "failed to fetch UID and GID from pid status")
+	}
+
 	if req.EnterNS {
 		processBuilder = processBuilder.EnableLocalMnt()
 	}
-
-	processBuilder = processBuilder.SetUIDGID(processUIDGID.Uid, processUIDGID.Gid)
 
 	cmd := processBuilder.Build(ctx)
 	output, err := cmd.CombinedOutput()
