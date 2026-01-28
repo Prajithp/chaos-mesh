@@ -96,12 +96,18 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 			log.Info("copy", "jar name", jar, "from source", source, "to destination", dest, "output", string(output))
 		}
 
-		bins := []string{"bminstall.sh"}
+		bins := []string{"bminstall.sh", "bmsubmit.sh"}
 		for _, bin := range bins {
 			source := fmt.Sprintf("%s/bin/%s", bytemanHome, bin)
 			dest := fmt.Sprintf("/usr/local/byteman/bin/%s", bin)
 
 			output, err := copyFileAcrossNS(ctx, source, dest, pid)
+			if err != nil {
+				return nil, err
+			}
+
+			processBuilder := bpm.DefaultProcessBuilder("sh", "-c", fmt.Sprintf("chmod 755 %s/bin/%s", bytemanHome, bin)).SetContext(ctx).SetNS(pid, bpm.MountNS)
+			output, err = processBuilder.Build(ctx).CombinedOutput()
 			if err != nil {
 				return nil, err
 			}
