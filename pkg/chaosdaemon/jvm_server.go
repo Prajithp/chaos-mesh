@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	bmInstallCommand = "bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
+	bmInstallCommand = "/usr/local/byteman/bin/bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
 	bmSubmitCommand  = "bmsubmit.sh -p %d -%s %s"
 )
 
@@ -78,7 +78,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 			log.Info("mkdir", "output", string(output))
 		}
 
-		jars := []string{"bminstall.sh", "byteman.jar", "byteman-helper.jar", "chaos-agent.jar"}
+		jars := []string{"byteman.jar", "byteman-helper.jar", "chaos-agent.jar"}
 
 		for _, jar := range jars {
 			source := fmt.Sprintf("%s/lib/%s", bytemanHome, jar)
@@ -91,16 +91,29 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 
 			log.Info("copy", "jar name", jar, "from source", source, "to destination", dest, "output", string(output))
 		}
+
+		bins := []string{"bminstall.sh"}
+		for _, bin := range bins {
+			source := fmt.Sprintf("%s/bin/%s", bytemanHome, bin)
+			dest := fmt.Sprintf("/usr/local/byteman/bin/%s", bin)
+
+			output, err = copyFileAcrossNS(ctx, source, dest, pid)
+			if err != nil {
+				return nil, err
+			}
+
+			log.Info("copy", "bin name", bin, "from source", source, "to destination", dest, "output", string(output))
+		}
 	}
 
-	var processBuilder *bpm.CommandBuilder
+	var bmInstallCmd string
 	if nsPid, err := util.GetNamespacedPID(pid); err == nil {
-		bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, nsPid)
-		processBuilder = bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx).SetNS(pid, bpm.MountNS)
+		bmInstallCmd = fmt.Sprintf(bmInstallCommand, req.Port, nsPid)
 	} else {
-		bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, pid)
-		processBuilder = bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
+		bmInstallCmd = fmt.Sprintf(bmInstallCommand, req.Port, pid)
 	}
+
+	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
 
 	if processUIDGID, err := util.GetProcessUidGid(pid); err == nil {
 		processBuilder = processBuilder.SetUIDGID(processUIDGID.Uid, processUIDGID.Gid)
@@ -109,7 +122,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 	}
 
 	if req.EnterNS {
-		processBuilder = processBuilder.EnableLocalMnt()
+		processBuilder = processBuilder.SetNS(pid, bpm.MountNS)
 	}
 
 	cmd := processBuilder.Build(ctx)
