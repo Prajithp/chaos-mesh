@@ -50,6 +50,10 @@ func (b *CommandBuilder) Build(ctx context.Context) *ManagedCommand {
 		cmd = "choom"
 	}
 
+	if b.uid != 0 || b.gid != 0 {
+		args = append([]string{"--uid", strconv.Itoa(int(b.uid)), "--gid", strconv.Itoa(int(b.gid))}, args...)
+	}
+
 	// pause should always be the first command to execute because the
 	// `stress_server` will check whether the /proc/PID/comm is `pause` to
 	// determine whether it should continue to send `SIGCONT`. If the first

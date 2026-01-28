@@ -16,10 +16,12 @@
 package util
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -112,6 +114,75 @@ func GetChildProcesses(ppid uint32, logger logr.Logger) ([]uint32, error) {
 			return processGraph.Flatten(ppid, logger), nil
 		}
 	}
+}
+
+// ProcessUidGid represents the UID and GID of a process
+type ProcessUidGid struct {
+	Uid uint32
+	Gid uint32
+}
+
+// GetProcessUidGid returns the real UID and GID of a process by reading /proc/[pid]/status
+func GetProcessUidGid(pid uint32) (*ProcessUidGid, error) {
+	statusPath := fmt.Sprintf("%s/%d/status", bpm.DefaultProcPrefix, pid)
+	f, err := os.Open(statusPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "open %s", statusPath)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	var uid, gid uint32
+	var uidFound, gidFound bool
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Uid line format: "Uid:	1000	1000	1000	1000"
+		// The fields are: Real, Effective, Saved Set, and Filesystem UID
+		if strings.HasPrefix(line, "Uid:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				val, err := strconv.ParseUint(fields[1], 10, 32)
+				if err != nil {
+					return nil, errors.Wrapf(err, "parse uid from %s", line)
+				}
+				uid = uint32(val)
+				uidFound = true
+			}
+		}
+
+		// Gid line format: "Gid:	1000	1000	1000	1000"
+		// The fields are: Real, Effective, Saved Set, and Filesystem GID
+		if strings.HasPrefix(line, "Gid:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				val, err := strconv.ParseUint(fields[1], 10, 32)
+				if err != nil {
+					return nil, errors.Wrapf(err, "parse gid from %s", line)
+				}
+				gid = uint32(val)
+				gidFound = true
+			}
+		}
+
+		if uidFound && gidFound {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, errors.Wrapf(err, "scan %s", statusPath)
+	}
+
+	if !uidFound || !gidFound {
+		return nil, errors.Errorf("uid or gid not found in %s", statusPath)
+	}
+
+	return &ProcessUidGid{
+		Uid: uid,
+		Gid: gid,
+	}, nil
 }
 
 func EncodeOutputToError(output []byte, err error) error {

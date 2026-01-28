@@ -348,6 +348,8 @@ type CommandBuilder struct {
 	args []string
 	env  []string
 
+	uid, gid uint32
+
 	nsOptions []nsOption
 
 	pause    bool
@@ -446,6 +448,14 @@ func (b *CommandBuilder) SetStderr(stderr io.ReadWriteCloser) *CommandBuilder {
 // oom_score_adj ranges from -1000 to 1000
 func (b *CommandBuilder) SetOOMScoreAdj(scoreAdj int) *CommandBuilder {
 	b.oomScoreAdj = scoreAdj
+	return b
+}
+
+// SetUIDGID sets the user ID and group ID for the process.
+// The process will run with the specified uid and gid credentials.
+func (b *CommandBuilder) SetUIDGID(uid, gid uint32) *CommandBuilder {
+	b.uid = uid
+	b.gid = gid
 	return b
 }
 
