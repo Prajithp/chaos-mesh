@@ -103,7 +103,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 	}
 
 	bmInstallCmd := fmt.Sprintf(bmInstallCommand, req.Port, pid)
-	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
+	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx).SetNS(pid, bpm.MountNS)
 	if req.EnterNS {
 		processBuilder = processBuilder.EnableLocalMnt()
 	}
