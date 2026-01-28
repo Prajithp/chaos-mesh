@@ -69,13 +69,17 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 
 	// Copy byteman.jar, byteman-helper.jar and chaos-agent.jar into container's namespace.
 	if req.EnterNS {
-		processBuilder := bpm.DefaultProcessBuilder("sh", "-c", fmt.Sprintf("mkdir -p %s/lib/", bytemanHome)).SetContext(ctx).SetNS(pid, bpm.MountNS)
-		output, err := processBuilder.Build(ctx).CombinedOutput()
-		if err != nil {
-			return nil, err
-		}
-		if len(output) > 0 {
-			log.Info("mkdir", "output", string(output))
+		dirs := []string{"bin", "lib"}
+
+		for _, dir := range dirs {
+			processBuilder := bpm.DefaultProcessBuilder("sh", "-c", fmt.Sprintf("mkdir -p %s/%s/", bytemanHome, dir)).SetContext(ctx).SetNS(pid, bpm.MountNS)
+			output, err := processBuilder.Build(ctx).CombinedOutput()
+			if err != nil {
+				return nil, err
+			}
+			if len(output) > 0 {
+				log.Info("mkdir", "output", string(output))
+			}
 		}
 
 		jars := []string{"byteman.jar", "byteman-helper.jar", "chaos-agent.jar"}
@@ -84,7 +88,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 			source := fmt.Sprintf("%s/lib/%s", bytemanHome, jar)
 			dest := fmt.Sprintf("/usr/local/byteman/lib/%s", jar)
 
-			output, err = copyFileAcrossNS(ctx, source, dest, pid)
+			output, err := copyFileAcrossNS(ctx, source, dest, pid)
 			if err != nil {
 				return nil, err
 			}
@@ -97,7 +101,7 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 			source := fmt.Sprintf("%s/bin/%s", bytemanHome, bin)
 			dest := fmt.Sprintf("/usr/local/byteman/bin/%s", bin)
 
-			output, err = copyFileAcrossNS(ctx, source, dest, pid)
+			output, err := copyFileAcrossNS(ctx, source, dest, pid)
 			if err != nil {
 				return nil, err
 			}
