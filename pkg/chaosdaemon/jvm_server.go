@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -121,7 +122,10 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 		return nil, err
 	}
 
-	bmInstallCmd := fmt.Sprintf(bmInstallCommand, procUidGid.Uid, procUidGid.Gid, req.Port, pid)
+	uid := strconv.Itoa(int(procUidGid.Uid))
+	gid := strconv.Itoa(int(procUidGid.Gid))
+
+	bmInstallCmd := fmt.Sprintf(bmInstallCommand, uid, gid, req.Port, pid)
 	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
 
 	if req.EnterNS {
