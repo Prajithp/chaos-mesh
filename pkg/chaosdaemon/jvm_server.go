@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	bmInstallCommand = "/usr/local/byteman/bin/bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
+	bmInstallCommand = "chroot --userspec:%s:%s / /usr/local/byteman/bin/bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
 	bmSubmitCommand  = "bmsubmit.sh -p %d -%s %s"
 )
 
@@ -116,23 +116,16 @@ func (s *DaemonServer) InstallJVMRules(ctx context.Context,
 		}
 	}
 
-	var bmInstallCmd string
-	if nsPid, err := util.GetNamespacedPID(pid); err == nil {
-		bmInstallCmd = fmt.Sprintf(bmInstallCommand, req.Port, nsPid)
-	} else {
-		bmInstallCmd = fmt.Sprintf(bmInstallCommand, req.Port, pid)
+	procUidGid, err := util.GetProcessUidGid(pid)
+	if err != nil {
+		return nil, err
 	}
 
+	bmInstallCmd := fmt.Sprintf(bmInstallCommand, procUidGid.Uid, procUidGid.Gid, req.Port, pid)
 	processBuilder := bpm.DefaultProcessBuilder("sh", "-c", bmInstallCmd).SetContext(ctx)
 
-	if processUIDGID, err := util.GetProcessUidGid(pid); err == nil {
-		processBuilder = processBuilder.SetUIDGID(processUIDGID.Uid, processUIDGID.Gid)
-	} else {
-		log.Error(err, "failed to fetch UID and GID from pid status")
-	}
-
 	if req.EnterNS {
-		processBuilder = processBuilder.SetNS(pid, bpm.MountNS)
+		processBuilder = processBuilder.EnableLocalMnt()
 	}
 
 	cmd := processBuilder.Build(ctx)
