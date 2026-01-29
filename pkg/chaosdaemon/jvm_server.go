@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	bmInstallCommand = "chroot --userspec:%s:%s / /usr/local/byteman/bin/bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
+	bmInstallCommand = "chroot --userspec=%s:%s / /usr/local/byteman/bin/bminstall.sh -b -Dorg.jboss.byteman.transform.all -Dorg.jboss.byteman.verbose -Dorg.jboss.byteman.compileToBytecode -p %d %d"
 	bmSubmitCommand  = "bmsubmit.sh -p %d -%s %s"
 )
 
